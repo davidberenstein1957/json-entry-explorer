@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  
   <style>
     :root {
       --bg: #0f0f12;
@@ -34,7 +33,7 @@
     .layout {
       display: flex;
       flex-direction: column;
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 1rem;
     }
@@ -93,13 +92,23 @@
     }
     .results {
       margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 900px) {
+      .results { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .results { grid-template-columns: 1fr; }
     }
     .entry {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
-      margin-bottom: 1rem;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .entry-meta {
       display: flex;
@@ -149,6 +158,8 @@
     .entry-details .reasoning { margin-top: 0.35rem; white-space: pre-wrap; }
     .chat {
       padding: 0.75rem;
+      flex: 1;
+      min-height: 0;
     }
     .message {
       margin-bottom: 0.75rem;
@@ -237,9 +248,11 @@
             <option value="domain">Domain</option>
             <option value="module">Module</option>
             <option value="model">Model</option>
+            <option value="shuffle">Shuffle</option>
           </select>
         </label>
         <input type="search" id="search" placeholder="Search in messages…" autocomplete="off">
+        <button type="button" id="shuffle" class="btn-copy">Shuffle</button>
       </div>
       <div class="stats" id="stats"></div>
     </header>
@@ -263,11 +276,24 @@
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-          const text = reader.result;
-          const items = file.name.endsWith('.jsonl')
-            ? parseJsonl(text)
-            : parseJson(text);
-          resolve(items);
+          const text = String(reader.result ?? '').trim();
+          if (text.startsWith('<')) {
+            reject(new Error('File appears to be HTML, not JSON. Select a .jsonl or .json file.'));
+            return;
+          }
+          let items;
+          try {
+            items = file.name.endsWith('.jsonl') ? parseJsonl(text) : parseJson(text);
+          } catch (e) {
+            try {
+              items = parseJsonl(text);
+            } catch {
+              reject(new Error('Could not parse file. Ensure it is valid JSON or JSONL.'));
+              return;
+            }
+          }
+          if (!items.length) reject(new Error('No valid entries found in file.'));
+          else resolve(items);
         };
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsText(file, 'utf-8');
@@ -348,10 +374,20 @@
       return `<div class="entry">${meta}${actions}<div class="chat">${chat}</div>${details}</div>`;
     }
 
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
     function applyFiltersAndSort(data, domain, severity, module, model, search, sort) {
       let filtered = data.filter(item =>
         matchesFilters(item, domain, severity, module, model) && matchesSearch(item, search)
       );
+      if (sort === 'shuffle') return shuffle(filtered);
       const [key, dir] = (sort || 'severity-desc').split('-');
       const asc = dir === 'asc';
       filtered.sort((a, b) => {
@@ -424,6 +460,10 @@
 
       function attachListeners() {
         [domainSel, severitySel, moduleSel, modelSel, sortSel].forEach(el => el.addEventListener('change', render));
+        document.getElementById('shuffle').addEventListener('click', () => {
+          sortSel.value = 'shuffle';
+          render();
+        });
         resultsEl.addEventListener('click', (e) => {
           const btn = e.target.closest('.btn-copy');
           if (!btn) return;
