@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phare Output Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a1f;
+      --border: #2a2a32;
+      --text: #e4e4e7;
+      --muted: #71717a;
+      --accent: #22d3ee;
+      --accent-dim: #06b6d4;
+      --user-bg: #164e63;
+      --assistant-bg: #27272a;
+      --danger: #f87171;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .layout {
+      display: flex;
+      flex-direction: column;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    header {
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .filters label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+    .filters select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+    }
+    .filters input[type="search"] {
+      flex: 1;
+      min-width: 180px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.35rem 0.6rem;
+      font-size: 0.875rem;
+    }
+    .filters input[type="search"]::placeholder {
+      color: var(--muted);
+    }
+    .filters input[type="file"] {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .stats {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .results {
+      margin-top: 1rem;
+    }
+    .entry {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .entry-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .entry-meta span {
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: var(--border);
+    }
+    .entry-meta .domain { color: var(--accent); }
+    .entry-meta .severity { color: var(--warn); }
+    .entry-meta .severity.high { color: var(--danger); }
+    .entry-meta .module { color: #a78bfa; }
+    .entry-meta .model { color: #34d399; }
+    .entry-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0.35rem 0.75rem;
+      gap: 0.5rem;
+    }
+    .btn-copy {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.5rem;
+      background: var(--border);
+      color: var(--text);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-copy:hover { background: var(--accent-dim); }
+    .btn-copy.copied { color: var(--accent); }
+    .entry-details {
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+    }
+    .entry-details summary { cursor: pointer; }
+    .entry-details .reasoning { margin-top: 0.35rem; white-space: pre-wrap; }
+    .chat {
+      padding: 0.75rem;
+    }
+    .message {
+      margin-bottom: 0.75rem;
+      max-width: 85%;
+    }
+    .message:last-child { margin-bottom: 0; }
+    .message.user {
+      margin-left: 0;
+      margin-right: auto;
+    }
+    .message.assistant {
+      margin-left: auto;
+      margin-right: 0;
+    }
+    .message-bubble {
+      padding: 0.6rem 0.85rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .message.user .message-bubble {
+      background: var(--user-bg);
+      border-bottom-left-radius: 4px;
+    }
+    .message.assistant .message-bubble {
+      background: var(--assistant-bg);
+      border-bottom-right-radius: 4px;
+    }
+    .message-role {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+    }
+    .error {
+      color: var(--danger);
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <h1>Phare output explorer</h1>
+      <div class="filters">
+        <label>
+          <span>Load JSONL</span>
+          <input type="file" id="file" accept=".jsonl,.json">
+        </label>
+        <label>
+          Domain
+          <select id="domain">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label>
+          Severity
+          <select id="severity">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label>
+          Module
+          <select id="module">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label>
+          Model
+          <select id="model">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label>
+          Sort
+          <select id="sort">
+            <option value="severity-desc">Severity ↓</option>
+            <option value="severity-asc">Severity ↑</option>
+            <option value="domain">Domain</option>
+            <option value="module">Module</option>
+            <option value="model">Model</option>
+          </select>
+        </label>
+        <input type="search" id="search" placeholder="Search in messages…" autocomplete="off">
+      </div>
+      <div class="stats" id="stats"></div>
+    </header>
+    <div class="results" id="results">
+      <div class="loading" id="loading">Select a .jsonl or .json file to load</div>
+    </div>
+  </div>
+  <script>
+    function parseJsonl(text) {
+      return text.trim().split('\n').map(line => {
+        try { return JSON.parse(line); } catch { return null; }
+      }).filter(Boolean);
+    }
+
+    function parseJson(text) {
+      const data = JSON.parse(text);
+      return Array.isArray(data) ? data : [data];
+    }
+
+    function loadFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const text = reader.result;
+          const items = file.name.endsWith('.jsonl')
+            ? parseJsonl(text)
+            : parseJson(text);
+          resolve(items);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsText(file, 'utf-8');
+      });
+    }
+
+    function getDomain(item) {
+      return item?.domain_classification?.domains ?? 'unknown';
+    }
+
+    function getSeverity(item) {
+      const s = item?.severity_classification?.severity;
+      return s == null ? null : s;
+    }
+
+    function getModule(item) {
+      return item?.module ?? 'unknown';
+    }
+
+    function getModel(item) {
+      return item?.model ?? 'unknown';
+    }
+
+    function matchesSearch(item, q) {
+      if (!q || !q.trim()) return true;
+      const lower = q.toLowerCase().trim();
+      const msgs = item?.messages ?? [];
+      return msgs.some(m => (m.content || '').toLowerCase().includes(lower));
+    }
+
+    function matchesFilters(item, domain, severity, module, model) {
+      if (domain && getDomain(item) !== domain) return false;
+      if (severity !== '' && getSeverity(item) !== parseInt(severity, 10)) return false;
+      if (module && getModule(item) !== module) return false;
+      if (model && getModel(item) !== model) return false;
+      return true;
+    }
+
+    function renderMessage(msg) {
+      const role = msg.role === 'user' ? 'user' : 'assistant';
+      const label = role === 'user' ? 'User' : 'Assistant';
+      return `<div class="message ${role}">
+        <div class="message-role">${label}</div>
+        <div class="message-bubble">${escapeHtml(msg.content || '')}</div>
+      </div>`;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function renderEntry(item, idx) {
+      const domain = getDomain(item);
+      const severity = getSeverity(item);
+      const module = getModule(item);
+      const model = getModel(item);
+      const severityClass = severity >= 6 ? 'high' : '';
+      const sampleId = item?.sample_id ? String(item.sample_id).slice(0, 8) : '';
+      const meta = `<div class="entry-meta"><span class="domain">${escapeHtml(domain)}</span>
+        <span class="severity ${severityClass}">${severity ?? '—'}</span>
+        <span class="module">${escapeHtml(module)}</span>
+        <span class="model">${escapeHtml(model)}</span>
+        ${sampleId ? `<span title="${escapeHtml(item.sample_id)}">${escapeHtml(sampleId)}…</span>` : ''}</div>`;
+      const actions = `<div class="entry-actions"><button class="btn-copy" data-idx="${idx}" type="button">Copy JSON</button></div>`;
+      const chat = (item.messages ?? []).map(renderMessage).join('');
+      const ev = item?.evaluation;
+      const score = ev?.score != null ? ev.score : null;
+      const sevReason = item?.severity_classification?.reasoning;
+      const domReason = item?.domain_classification?.reasoning;
+      const hasDetails = score != null || sevReason || domReason;
+      const details = hasDetails ? `<details class="entry-details"><summary>Details</summary>
+        ${score != null ? `<div>Score: ${score}</div>` : ''}
+        ${sevReason ? `<div class="reasoning"><strong>Severity:</strong> ${escapeHtml(sevReason)}</div>` : ''}
+        ${domReason ? `<div class="reasoning"><strong>Domain:</strong> ${escapeHtml(domReason)}</div>` : ''}
+        </details>` : '';
+      return `<div class="entry">${meta}${actions}<div class="chat">${chat}</div>${details}</div>`;
+    }
+
+    function applyFiltersAndSort(data, domain, severity, module, model, search, sort) {
+      let filtered = data.filter(item =>
+        matchesFilters(item, domain, severity, module, model) && matchesSearch(item, search)
+      );
+      const [key, dir] = (sort || 'severity-desc').split('-');
+      const asc = dir === 'asc';
+      filtered.sort((a, b) => {
+        if (key === 'severity') {
+          const sa = getSeverity(a) ?? 0;
+          const sb = getSeverity(b) ?? 0;
+          return asc ? sa - sb : sb - sa;
+        }
+        if (key === 'domain') {
+          const va = getDomain(a);
+          const vb = getDomain(b);
+          return va.localeCompare(vb) * (asc ? 1 : -1);
+        }
+        if (key === 'module') {
+          const va = getModule(a);
+          const vb = getModule(b);
+          return va.localeCompare(vb) * (asc ? 1 : -1);
+        }
+        if (key === 'model') {
+          const va = getModel(a);
+          const vb = getModel(b);
+          return va.localeCompare(vb) * (asc ? 1 : -1);
+        }
+        return 0;
+      });
+      return filtered;
+    }
+
+    function run() {
+      const domainSel = document.getElementById('domain');
+      const severitySel = document.getElementById('severity');
+      const moduleSel = document.getElementById('module');
+      const modelSel = document.getElementById('model');
+      const sortSel = document.getElementById('sort');
+      const searchInput = document.getElementById('search');
+      const resultsEl = document.getElementById('results');
+      const statsEl = document.getElementById('stats');
+      const loadingEl = document.getElementById('loading');
+
+      let allData = [];
+
+      function populateOptions() {
+        domainSel.innerHTML = '<option value="">All</option>';
+        severitySel.innerHTML = '<option value="">All</option>';
+        moduleSel.innerHTML = '<option value="">All</option>';
+        modelSel.innerHTML = '<option value="">All</option>';
+        const domains = [...new Set(allData.map(getDomain))].filter(Boolean).sort();
+        const severities = [...new Set(allData.map(getSeverity).filter(s => s != null))].sort((a, b) => a - b);
+        const modules = [...new Set(allData.map(getModule))].filter(Boolean).sort();
+        const models = [...new Set(allData.map(getModel))].filter(Boolean).sort();
+        domains.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; domainSel.appendChild(o); });
+        severities.forEach(s => { const o = document.createElement('option'); o.value = String(s); o.textContent = s; severitySel.appendChild(o); });
+        modules.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; moduleSel.appendChild(o); });
+        models.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; modelSel.appendChild(o); });
+      }
+
+      let filteredData = [];
+
+      function render() {
+        const domain = domainSel.value;
+        const severity = severitySel.value;
+        const module = moduleSel.value;
+        const model = modelSel.value;
+        const sort = sortSel.value;
+        const search = searchInput.value;
+        filteredData = applyFiltersAndSort(allData, domain, severity, module, model, search, sort);
+        statsEl.textContent = `Showing ${filteredData.length} of ${allData.length}`;
+        resultsEl.innerHTML = filteredData.map((item, i) => renderEntry(item, i)).join('');
+      }
+
+      function attachListeners() {
+        [domainSel, severitySel, moduleSel, modelSel, sortSel].forEach(el => el.addEventListener('change', render));
+        resultsEl.addEventListener('click', (e) => {
+          const btn = e.target.closest('.btn-copy');
+          if (!btn) return;
+          const idx = parseInt(btn.dataset.idx, 10);
+          const item = filteredData[idx];
+          if (!item) return;
+          navigator.clipboard.writeText(JSON.stringify(item, null, 2)).then(() => {
+            btn.textContent = 'Copied';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy JSON'; btn.classList.remove('copied'); }, 1500);
+          });
+        });
+        searchInput.addEventListener('input', render);
+        document.getElementById('file').addEventListener('change', (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          loadingEl.textContent = 'Loading…';
+          loadingEl.style.display = 'block';
+          resultsEl.innerHTML = '';
+          resultsEl.appendChild(loadingEl);
+          loadFromFile(file)
+            .then(data => {
+              allData = data;
+              loadingEl.remove();
+              populateOptions();
+              render();
+            })
+            .catch(err => {
+              loadingEl.remove();
+              resultsEl.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+            });
+        });
+      }
+
+      attachListeners();
+    }
+
+    run();
+  </script>
+</body>
+</html>
